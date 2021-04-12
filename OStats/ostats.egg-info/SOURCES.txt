@@ -1,0 +1,10 @@
+setup.py
+ostats/__init__.py
+ostats/distributions.py
+ostats/dplot.py
+ostats.egg-info/PKG-INFO
+ostats.egg-info/SOURCES.txt
+ostats.egg-info/dependency_links.txt
+ostats.egg-info/not-zip-safe
+ostats.egg-info/requires.txt
+ostats.egg-info/top_level.txt
