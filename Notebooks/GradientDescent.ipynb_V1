@@ -1,0 +1,520 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Optimization using gradient descent"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "This notebook allows one to do conduct uni- and multivariate linear fits using the gradient descent method. \n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%matplotlib widget\n",
+    "\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import matplotlib.pyplot as plt\n",
+    "import matplotlib.colors as colors\n",
+    "import matplotlib.cm as cm\n",
+    "#from mpltools import color as colors"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "--2021-05-25 18:04:14--  https://raw.githubusercontent.com/ageron/handson-ml2/master/datasets/housing/housing.csv\n",
+      "Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.111.133, 185.199.108.133, 185.199.109.133, ...\n",
+      "Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.111.133|:443... connected.\n",
+      "HTTP request sent, awaiting response... 200 OK\n",
+      "Length: 1423529 (1.4M) [text/plain]\n",
+      "Saving to: ‘./data/housing.csv’\n",
+      "\n",
+      "housing.csv         100%[===================>]   1.36M  3.43MB/s    in 0.4s    \n",
+      "\n",
+      "2021-05-25 18:04:14 (3.43 MB/s) - ‘./data/housing.csv’ saved [1423529/1423529]\n",
+      "\n",
+      "--2021-05-25 18:04:14--  https://datahub.io/core/global-temp/r/annual.csv\n",
+      "Resolving datahub.io (datahub.io)... 104.21.40.221, 172.67.157.38\n",
+      "Connecting to datahub.io (datahub.io)|104.21.40.221|:443... connected.\n",
+      "HTTP request sent, awaiting response... 302 Found\n",
+      "Location: https://pkgstore.datahub.io/core/global-temp/annual_csv/data/a26b154688b061cdd04f1df36e4408be/annual_csv.csv [following]\n",
+      "--2021-05-25 18:04:16--  https://pkgstore.datahub.io/core/global-temp/annual_csv/data/a26b154688b061cdd04f1df36e4408be/annual_csv.csv\n",
+      "Resolving pkgstore.datahub.io (pkgstore.datahub.io)... 172.67.157.38, 104.21.40.221\n",
+      "Connecting to pkgstore.datahub.io (pkgstore.datahub.io)|172.67.157.38|:443... connected.\n",
+      "HTTP request sent, awaiting response... 200 OK\n",
+      "Length: 5230 (5.1K) [text/plain]\n",
+      "Saving to: ‘./data/annual.csv.2’\n",
+      "\n",
+      "annual.csv.2        100%[===================>]   5.11K  --.-KB/s    in 0.002s  \n",
+      "\n",
+      "2021-05-25 18:04:17 (2.33 MB/s) - ‘./data/annual.csv.2’ saved [5230/5230]\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "data_range = np.random.RandomState(1) #make up some fake data for testing\n",
+    "fakex = 10 * data_range.rand(50)\n",
+    "fakey = 2 * fakex - 5 + data_range.randn(50)\n",
+    "\n",
+    "\n",
+    "!rm -rf ./data/housing*\n",
+    "!wget -P ./data https://raw.githubusercontent.com/ageron/handson-ml2/master/datasets/housing/housing.csv\n",
+    "    \n",
+    "#get some data for testing\n",
+    "!wget -P ./data https://datahub.io/core/global-temp/r/annual.csv"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 47,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "year, tempa = np.loadtxt('./data/annual.csv', skiprows=1, delimiter=\",\", usecols=(1,2), unpack=True)\n",
+    "year = np.array([int(y) for y in year])/np.max(year); tempa=np.array(tempa)+1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 48,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "year = 1 + (year - np.mean(year))/(np.max(year)-np.min(year))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 49,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "array([1.5       , 1.5       , 1.49264706, 1.49264706, 1.48529412,\n",
+       "       1.48529412, 1.47794118, 1.47794118, 1.47058824, 1.47058824,\n",
+       "       1.46323529, 1.46323529, 1.45588235, 1.45588235, 1.44852941,\n",
+       "       1.44852941, 1.44117647, 1.44117647, 1.43382353, 1.43382353,\n",
+       "       1.42647059, 1.42647059, 1.41911765, 1.41911765, 1.41176471,\n",
+       "       1.41176471, 1.40441176, 1.40441176, 1.39705882, 1.39705882,\n",
+       "       1.38970588, 1.38970588, 1.38235294, 1.38235294, 1.375     ,\n",
+       "       1.375     , 1.36764706, 1.36764706, 1.36029412, 1.36029412,\n",
+       "       1.35294118, 1.35294118, 1.34558824, 1.34558824, 1.33823529,\n",
+       "       1.33823529, 1.33088235, 1.33088235, 1.32352941, 1.32352941,\n",
+       "       1.31617647, 1.31617647, 1.30882353, 1.30882353, 1.30147059,\n",
+       "       1.30147059, 1.29411765, 1.29411765, 1.28676471, 1.28676471,\n",
+       "       1.27941176, 1.27941176, 1.27205882, 1.27205882, 1.26470588,\n",
+       "       1.26470588, 1.25735294, 1.25735294, 1.25      , 1.25      ,\n",
+       "       1.24264706, 1.24264706, 1.23529412, 1.23529412, 1.22794118,\n",
+       "       1.22794118, 1.22058824, 1.22058824, 1.21323529, 1.21323529,\n",
+       "       1.20588235, 1.20588235, 1.19852941, 1.19852941, 1.19117647,\n",
+       "       1.19117647, 1.18382353, 1.18382353, 1.17647059, 1.17647059,\n",
+       "       1.16911765, 1.16911765, 1.16176471, 1.16176471, 1.15441176,\n",
+       "       1.15441176, 1.14705882, 1.14705882, 1.13970588, 1.13970588,\n",
+       "       1.13235294, 1.13235294, 1.125     , 1.125     , 1.11764706,\n",
+       "       1.11764706, 1.11029412, 1.11029412, 1.10294118, 1.10294118,\n",
+       "       1.09558824, 1.09558824, 1.08823529, 1.08823529, 1.08088235,\n",
+       "       1.08088235, 1.07352941, 1.07352941, 1.06617647, 1.06617647,\n",
+       "       1.05882353, 1.05882353, 1.05147059, 1.05147059, 1.04411765,\n",
+       "       1.04411765, 1.03676471, 1.03676471, 1.02941176, 1.02941176,\n",
+       "       1.02205882, 1.02205882, 1.01470588, 1.01470588, 1.00735294,\n",
+       "       1.00735294, 1.        , 1.        , 0.99264706, 0.99264706,\n",
+       "       0.98529412, 0.98529412, 0.97794118, 0.97794118, 0.97058824,\n",
+       "       0.97058824, 0.96323529, 0.96323529, 0.95588235, 0.95588235,\n",
+       "       0.94852941, 0.94852941, 0.94117647, 0.94117647, 0.93382353,\n",
+       "       0.93382353, 0.92647059, 0.92647059, 0.91911765, 0.91911765,\n",
+       "       0.91176471, 0.91176471, 0.90441176, 0.90441176, 0.89705882,\n",
+       "       0.89705882, 0.88970588, 0.88970588, 0.88235294, 0.88235294,\n",
+       "       0.875     , 0.875     , 0.86764706, 0.86764706, 0.86029412,\n",
+       "       0.86029412, 0.85294118, 0.85294118, 0.84558824, 0.84558824,\n",
+       "       0.83823529, 0.83823529, 0.83088235, 0.83088235, 0.82352941,\n",
+       "       0.82352941, 0.81617647, 0.81617647, 0.80882353, 0.80882353,\n",
+       "       0.80147059, 0.80147059, 0.79411765, 0.79411765, 0.78676471,\n",
+       "       0.78676471, 0.77941176, 0.77941176, 0.77205882, 0.77205882,\n",
+       "       0.76470588, 0.76470588, 0.75735294, 0.75735294, 0.75      ,\n",
+       "       0.75      , 0.74264706, 0.74264706, 0.73529412, 0.73529412,\n",
+       "       0.72794118, 0.72794118, 0.72058824, 0.72058824, 0.71323529,\n",
+       "       0.71323529, 0.70588235, 0.70588235, 0.69852941, 0.69852941,\n",
+       "       0.69117647, 0.69117647, 0.68382353, 0.68382353, 0.67647059,\n",
+       "       0.67647059, 0.66911765, 0.66911765, 0.66176471, 0.66176471,\n",
+       "       0.65441176, 0.65441176, 0.64705882, 0.64705882, 0.63970588,\n",
+       "       0.63970588, 0.63235294, 0.63235294, 0.625     , 0.625     ,\n",
+       "       0.61764706, 0.61764706, 0.61029412, 0.61029412, 0.60294118,\n",
+       "       0.60294118, 0.59558824, 0.59558824, 0.58823529, 0.58823529,\n",
+       "       0.58088235, 0.58088235, 0.57352941, 0.57352941, 0.56617647,\n",
+       "       0.56617647, 0.55882353, 0.55882353, 0.55147059, 0.55147059,\n",
+       "       0.54411765, 0.54411765, 0.53676471, 0.53676471, 0.52941176,\n",
+       "       0.52941176, 0.52205882, 0.52205882, 0.51470588, 0.51470588,\n",
+       "       0.50735294, 0.50735294, 0.5       , 0.5       ])"
+      ]
+     },
+     "execution_count": 49,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "year"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 50,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "housing_data = pd.read_csv('./data/housing.csv')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 51,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#housing_data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 52,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "housing_data = housing_data[housing_data.median_house_value != 500001] #a bunch of values are set to this\n",
+    "housing_data = housing_data.sample(n=50) #smaller sample\n",
+    "housing_data.median_house_value = housing_data.median_house_value/100000"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 53,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#housing_data.median_house_value.max()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 54,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#housing_data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 55,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def gradient_descent(x, y, gamma, l, theta_init = None):\n",
+    "    '''\n",
+    "    theta = Coordinates of the line I'm fitting. list or array\n",
+    "    gamma = Step size: Currently a constant. Later I will add an adaptive method to calculate it\n",
+    "    X = list or array. X values of data I am fitting to.\n",
+    "    y list or array. Y values of the data I am fitting to.\n",
+    "    l = polynomial order of fit\n",
+    "    '''\n",
+    "    n = len(x)\n",
+    "\n",
+    "    #create X matrix\n",
+    "    X_matrix = np.zeros((n,l+1))\n",
+    "    if theta_init is not None:\n",
+    "        theta = theta_init\n",
+    "    else:\n",
+    "        theta = np.zeros(l+1)\n",
+    "    \n",
+    "    for i in range(n):\n",
+    "        for j in range(l+1):\n",
+    "            X_matrix[i,j] = x[i]**j\n",
+    "   \n",
+    "    X_matrix_T = X_matrix.T #transpose of X\n",
+    "\n",
+    "    #now do it\n",
+    "    k = 1\n",
+    "    kmax = 500\n",
+    "    store_theta = []\n",
+    "    gamma_X_matrix_T = gamma*X_matrix_T\n",
+    "    epsilon = 0.0001\n",
+    "    stop_condition = False\n",
+    "    while not stop_condition:\n",
+    "        store_theta.append(theta)\n",
+    "        X_matrix_times_theta_miny = np.matmul(X_matrix,theta) - y\n",
+    "        theta = theta - np.dot(gamma_X_matrix_T,X_matrix_times_theta_miny)/n\n",
+    "        stop_condition = (np.abs(theta[1] - store_theta[-1][1])/store_theta[-1][1] < epsilon) and (np.abs(theta[0] - store_theta[-1][0])/store_theta[-1][0] < epsilon)\n",
+    "       # stop_condition = (((theta[1]-store_theta[-1][1])**2-(theta[0]-store_theta[-1][0])**2)**0.5/((store_theta[-1][1])**2-(store_theta[-1][0])**2)**0.5 < epsilon) \n",
+    "        k +=1\n",
+    "    print(k)\n",
+    "    return(store_theta)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "metadata": {
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "3771\n",
+      "1437\n",
+      "842\n",
+      "[-1.59130127  1.51117259] [-4.55669073  1.96028456]\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "<ipython-input-55-f3754f4a30c4>:35: RuntimeWarning: divide by zero encountered in double_scalars\n",
+      "  stop_condition = (np.abs(theta[1] - store_theta[-1][1])/store_theta[-1][1] < epsilon) and (np.abs(theta[0] - store_theta[-1][0])/store_theta[-1][0] < epsilon)\n"
+     ]
+    }
+   ],
+   "source": [
+    "x_house = housing_data['median_house_value'].to_numpy()\n",
+    "y_house = housing_data['total_bedrooms'].to_numpy()\n",
+    "a = gradient_descent(x=x_house, y=y_house, gamma=0.0001, l=1)\n",
+    "b = gradient_descent(x=fakex, y=fakey, gamma=0.001, l=1)\n",
+    "C = gradient_descent(x=fakex, y=fakey, gamma=0.01, l=1)\n",
+    "print(b[-1],C[-1])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 57,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def plotfit(x, beta):\n",
+    "    funct = beta[-1][0]+x*beta[-1][1]\n",
+    "    return(funct)\n",
+    "\n",
+    "def plotfit2(x, beta):\n",
+    "    functs=[]\n",
+    "    points = np.linspace(0,len(beta),10)\n",
+    "    points = [int(x) for x in points]\n",
+    "    for i in range(len(points)-1):\n",
+    "        functs.append(beta[points[i]][0]+x*beta[points[i]][1])\n",
+    "    return(functs)\n",
+    "\n",
+    "def ColorGradient(start = (256,256,256), stop=(0,0,0), n=2):\n",
+    "    '''\n",
+    "    Pick two colour and gives back gradient of those colours\n",
+    "    '''\n",
+    "    gradR = np.linspace(start[0]/256,stop[0]/256,n)\n",
+    "    gradG = np.linspace(start[1]/256,stop[1]/256,n)\n",
+    "    gradB = np.linspace(start[2]/256,stop[2]/256,n)\n",
+    "    gradient = []\n",
+    "    for i in range(n):\n",
+    "        gradient.append((gradR[i],gradG[i],gradB[i]))\n",
+    "\n",
+    "\n",
+    "    return gradient"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 58,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "ce77bbb43f9c498d97bf15d117b5ef1a",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "Canvas(toolbar=Toolbar(toolitems=[('Home', 'Reset original view', 'home', 'home'), ('Back', 'Back to previous …"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "ifig=1;plt.close(ifig);plt.figure(ifig,figsize=(7,6), dpi=120)\n",
+    "plt.scatter(fakex,fakey, c='darkred',  s=15)\n",
+    "nlines = 10\n",
+    "for i in range(nlines):\n",
+    "    plt.plot(fakex,plotfit2(fakex,beta=C)[i-1], color=ColorGradient(stop=(11, 0, 59), n=nlines)[i],lw=1)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 74,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "8be6527b7e684e79b6098ccc776979fa",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "Canvas(toolbar=Toolbar(toolitems=[('Home', 'Reset original view', 'home', 'home'), ('Back', 'Back to previous …"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "ifig=2;plt.close(ifig);plt.figure(ifig,figsize=(7,6), dpi=120)\n",
+    "plt.scatter(x_house, y=y_house, c='g',  s=15)\n",
+    "nlines = 10\n",
+    "for i in range(nlines):\n",
+    "    plt.plot(x_house,plotfit2(x_house,beta=a)[i-1],\\\n",
+    "             color=ColorGradient(stop=(0, 10, 59), n=nlines)[i],lw=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 73,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "405ba9c5844e4376b2f7992f1708d85b",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "Canvas(toolbar=Toolbar(toolitems=[('Home', 'Reset original view', 'home', 'home'), ('Back', 'Back to previous …"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "6703\n"
+     ]
+    }
+   ],
+   "source": [
+    "ifig=3;plt.close(ifig);plt.figure(ifig,figsize=(7,6), dpi=120)\n",
+    "d = gradient_descent(x=year, y=tempa, gamma=0.01, l=1, theta_init = np.array([0.5,0.5]))\n",
+    "plt.scatter(year, y=tempa, c='orange',  s=15)\n",
+    "nlines = 10\n",
+    "for i in range(nlines):\n",
+    "    plt.plot(year,plotfit2(year,beta=d)[i-1],\\\n",
+    "             color=ColorGradient(stop=(31, 80, 40), n=nlines)[i],lw=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 65,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "89890b4815194919975003961d79576d",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "Canvas(toolbar=Toolbar(toolitems=[('Home', 'Reset original view', 'home', 'home'), ('Back', 'Back to previous …"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "<matplotlib.collections.PathCollection at 0x7fa1acd81ee0>"
+      ]
+     },
+     "execution_count": 65,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "ifig=4;plt.close(ifig);plt.figure(ifig,figsize=(7,6), dpi=120)\n",
+    "plt.scatter(housing_data['median_house_value'], y=housing_data['median_income'], c='darkred',  s=15)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "1853\n",
+      "[-0.13669904  0.00723493  0.16984273]\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "<ipython-input-9-a35c0fad958e>:32: RuntimeWarning: divide by zero encountered in double_scalars\n",
+      "  stop_condition = (np.abs(theta[1] - store_theta[-1][1])/store_theta[-1][1] < epsilon) and (np.abs(theta[0] - store_theta[-1][0])/store_theta[-1][0] < epsilon)\n"
+     ]
+    }
+   ],
+   "source": [
+    " d=gradient_descent(x=fakex, y=fakey, gamma=0.0001, l=2)\n",
+    " print(d[-1])"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
