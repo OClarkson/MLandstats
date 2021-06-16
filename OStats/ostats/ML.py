@@ -55,15 +55,12 @@ def GradDes_Regression(x, y, gamma, epsilon = 0.0001, theta_init = None, n = 1):
 
 
 
-def Normal_Linear_Regression(x, y, l):
-    m = len(x)
+def Normal_Linear_Regression(x, y):
+    m = len(y) #number of points
     assert m <1e4
 
-    #create X matrix
-    X_matrix = np.ones((m,l+1))
-    for i in range(m):
-        for j in range(1,l+1):
-            X_matrix[i,j] = x[i]     
+    ones_list = np.ones(m)
+    X_matrix = np.vstack((ones_list,x)).T   
     #print(X_matrix)
     XTX = np.dot(X_matrix.T,X_matrix)
     XTy = np.dot(X_matrix.T,y)
