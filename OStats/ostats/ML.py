@@ -9,7 +9,7 @@ class distributions:
 #    self.subtype = subtype
     
     
-def GradDes_Regression(x, y, gamma, epsilon = 0.0001, theta_init = None, n = 1):
+def GradDes_Regression(x, y, gamma, epsilon = 0.0001, theta_init = None):
     '''
     gamma = Step size: Currently a constant. Later I will add an adaptive method to calculate it
     X = list or array. X values of data I am fitting to.
@@ -21,6 +21,7 @@ def GradDes_Regression(x, y, gamma, epsilon = 0.0001, theta_init = None, n = 1):
     ones_list = np.ones(m)
     X_matrix = np.vstack((ones_list,x)).T
     X_matrix_T = X_matrix.T #transpose of X
+    n = len(X_matrix_T)
 
     if theta_init is not None:  
         theta = theta_init
@@ -90,3 +91,44 @@ def thetato_y(x,y,theta):
     h = np.matmul(X_matrix,theta.T)
             
     return(h)
+
+
+def Log_Regression(x, y, gamma, epsilon = 0.0001, theta_init = None):
+    '''
+    gamma = Step size: Currently a constant. Later I will add an adaptive method to calculate it
+    X = list or array. X values of data I am fitting to.
+    y = list or array. Y values of the data I am fitting to.
+    n = number of variables 
+    theta_init = initial guesses for theta...list/vector
+    '''
+    m = len(y) #number of points
+    ones_list = np.ones(m)
+    X_matrix = np.vstack((ones_list,x)).T
+    X_matrix_T = X_matrix.T #transpose of X
+    n = len(X_matrix_T)
+
+    if theta_init is not None:  
+        theta = theta_init
+    else:
+        theta = np.zeros(n)
+    #now do it
+    k = 1
+    J = []
+    store_theta = []
+    gamma_X_matrix_T = gamma*X_matrix_T
+    stop_condition = False
+    while not stop_condition:
+        store_theta.append(theta)
+        thetaTx = np.dot(theta,X_matrix.T)   
+        sigmoid = 1/(1 + np.exp(-thetaTx))
+        yminsig = y - sigmoid
+        gamma_XT_times_yminsig = np.matmul(gamma_X_matrix_T,yminsig)
+        theta = theta + gamma_XT_times_yminsig
+     #   X_matrix_times_theta_miny = np.matmul(X_matrix,theta) - y
+     #   theta = theta - np.dot(gamma_X_matrix_T,X_matrix_times_theta_miny)/m
+        stop_condition = (np.abs(theta[1] - store_theta[-1][1])/store_theta[-1][1] < epsilon) and (np.abs(theta[0] -\
+        store_theta[-1][0])/store_theta[-1][0] < epsilon)
+
+        k +=1
+    
+    return(store_theta[-1])
